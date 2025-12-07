@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bingo Online Bacanísimo</title>
     <link rel="stylesheet" href="style.css">
+    <!-- Conectar con Socket.io -->
+    <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
     <header>
@@ -13,6 +15,7 @@
     </header>
 
     <main>
+        <!-- Sección de selección de sala -->
         <section id="room-selection">
             <h2>Elige el número de jugadores:</h2>
             <div class="room-options">
@@ -23,18 +26,51 @@
             </div>
         </section>
 
+        <!-- Sección del área de juego -->
         <section id="game-area" style="display: none;">
             <h2>Tu Cartón de Bingo</h2>
             <div id="bingo-card" class="card-grid">
-                </div>
+                <!-- Aquí se pueden generar los números de tu cartón dinámicamente -->
+            </div>
 
             <div id="game-info">
                 <p>Número Cantado: <span id="called-number">--</span></p>
                 <button id="call-bingo" disabled>¡BINGO!</button>
             </div>
+
+            <!-- Información de jugadores conectados y números cantados -->
+            <div id="playerInfo">Jugadores: 0/0</div>
+            <h3>Números Cantados:</h3>
+            <div id="numbers"></div>
+
+            <!-- Sección para marcar números manualmente -->
+            <div>
+                <label>Marcar número: </label>
+                <input id="markInput" type="number" min="1" max="75">
+                <button id="markBtn">Marcar</button>
+            </div>
         </section>
     </main>
 
+    <!-- Tu script principal -->
     <script src="script.js"></script>
+
+    <!-- Script adicional para manejar los botones de sala -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const roomButtons = document.querySelectorAll('.room-btn');
+            const roomSelection = document.getElementById('room-selection');
+            const gameArea = document.getElementById('game-area');
+
+            roomButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const players = parseInt(btn.dataset.players);
+                    roomSelection.style.display = 'none';
+                    gameArea.style.display = 'block';
+                    joinRoom(players); // Función del script.js
+                });
+            });
+        });
+    </script>
 </body>
-</html>
+            </html>
