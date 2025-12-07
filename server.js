@@ -18,6 +18,7 @@ app.use(express.static('public'));
 // Lógica de Juego de Bingo y Salas
 // ----------------------------------------------------
 
+// Objeto para almacenar todas las salas de juego activas
 const rooms = {}; 
 
 function initializeGame(roomName) {
@@ -25,6 +26,7 @@ function initializeGame(roomName) {
     const maxPlayers = rooms[roomName].max;
     
     rooms[roomName].numbersCalled = []; 
+    // Crea un array con números del 1 al 75
     rooms[roomName].availableNumbers = Array.from({ length: 75 }, (_, i) => i + 1); 
     rooms[roomName].gameStarted = true;
     rooms[roomName].currentNumber = null;
@@ -43,6 +45,7 @@ function callNextNumber(roomName) {
         return;
     }
 
+    // Selecciona un número al azar de los disponibles
     const randomIndex = Math.floor(Math.random() * room.availableNumbers.length);
     const newNumber = room.availableNumbers.splice(randomIndex, 1)[0]; 
     
@@ -124,7 +127,7 @@ io.on('connection', (socket) => {
 
             io.to(roomName).emit('playerUpdate', { players: currentPlayers, max: room.max });
 
-            // Iniciar el juego si la sala está llena
+            // Iniciar el juego si la sala está llena (Línea crítica: ~173)
             if (currentPlayers === room.max) {
                 initializeGame(roomName);
             }
@@ -171,7 +174,7 @@ io.on('connection', (socket) => {
 });
 
 // ----------------------------------------------------
-// Iniciar el Servidor
+// Iniciar el Servidor (Sintaxis corregida en inglés)
 // ----------------------------------------------------
 
 server.listen(PORT, () => {
