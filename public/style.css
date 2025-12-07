@@ -1,0 +1,88 @@
+/* Estilo para el fondo de color en bucle */
+@keyframes colorLoop {
+    0% { background-color: #ff0000; } /* Rojo */
+    25% { background-color: #ffff00; } /* Amarillo */
+    50% { background-color: #00ff00; } /* Verde */
+    75% { background-color: #0000ff; } /* Azul */
+    100% { background-color: #ff0000; } /* Vuelve a Rojo */
+}
+
+body {
+    font-family: 'Arial', sans-serif;
+    margin: 0;
+    padding: 0;
+    color: #333;
+    /* Aplicar la animación al fondo */
+    animation: colorLoop 15s infinite alternate; 
+    transition: background-color 1s ease;
+}
+
+header {
+    background-color: rgba(255, 255, 255, 0.9);
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+main {
+    max-width: 1000px;
+    margin: 30px auto;
+    padding: 20px;
+    background-color: rgba(255, 255, 255, 0.95); /* Fondo blanco semi-transparente para contraste */
+    border-radius: 10px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+}
+
+/* Estilos de botones de sala */
+.room-options {
+    display: flex;
+    justify-content: space-around;
+    margin-top: 20px;
+}
+
+.room-btn {
+    padding: 15px 25px;
+    border: none;
+    border-radius: 5px;
+    background-color: #4CAF50; /* Verde vibrante */
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.1s;
+}
+
+.room-btn:hover {
+    background-color: #45a049;
+    transform: scale(1.05);
+}
+
+/* Estilos del cartón de Bingo */
+.card-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr); /* Típico cartón B-I-N-G-O */
+    width: 300px;
+    margin: 20px auto;
+    border: 3px solid #333;
+    background-color: #fff;
+}
+
+.card-cell {
+    border: 1px solid #ccc;
+    padding: 15px 0;
+    text-align: center;
+    font-weight: bold;
+    font-size: 20px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.card-cell:nth-child(-n+5) { /* Encabezados (BINGO) */
+    background-color: #f0f0f0;
+    font-size: 18px;
+    cursor: default;
+}
+
+.marked {
+    background-color: #ffcc00; /* Color llamativo al marcar */
+    color: #333;
+}
