@@ -1,212 +1,179 @@
-// **¡IMPORTANTE!** Reemplaza esta URL con la dirección HTTPS que Render le asignó a tu servicio web.
-const RENDER_URL = "https://bingo-sd6t.onrender.com"; 
+// Importa las librerías necesarias
+const express = require('express');
+const http = require('http');
+// Asegúrate de que la 'S' en Server sea MAYÚSCULA.
+const { Server } = require('socket.io'); 
 
-// Conexión específica a la URL de Render
-const socket = io(RENDER_URL, { transports: ['websocket', 'polling'] }); 
+// Configuración básica
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server); 
+// Usa el puerto que el servidor de hosting (Render) le asigne (process.env.PORT) o el 3000 local.
+const PORT = process.env.PORT || 3000; 
 
-// Referencias a los elementos del DOM
-const roomSelection = document.getElementById('room-selection');
-const gameArea = document.getElementById('game-area');
-const bingoCardContainer = document.getElementById('bingo-card');
-const roomButtons = document.querySelectorAll('.room-btn');
-const callBingoButton = document.getElementById('call-bingo');
-const calledNumberDisplay = document.getElementById('called-number');
-const statusMessage = document.getElementById('game-info'); // Usaremos esto para mensajes de estado
+// Middleware para servir los archivos estáticos (HTML, CSS, JS) desde la carpeta 'public'
+app.use(express.static('public'));
 
-// Variable global para almacenar los números cantados
-let calledNumbers = new Set(); 
-let myCardNumbers = {};
-let currentRoom = '';
+// ----------------------------------------------------
+// Lógica de Juego de Bingo y Salas
+// ----------------------------------------------------
 
-// --- 1. Lógica del Cartón de Bingo ---
+const rooms = {}; 
 
-function generateBingoCard() {
-    // Definición de rangos estándar de B-I-N-G-O (1-15, 16-30, etc.)
-    const ranges = {
-        'B': [1, 15], 'I': [16, 30], 'N': [31, 45], 'G': [46, 60], 'O': [61, 75]
-    };
-    const columns = ['B', 'I', 'N', 'G', 'O'];
-    myCardNumbers = {}; 
+function initializeGame(roomName) {
+    console.log(`[GAME] Inicializando juego para la sala: ${roomName}`);
+    const maxPlayers = rooms[roomName].max;
     
-    // 1. Llenar el objeto myCardNumbers con 5 números únicos por columna
-    columns.forEach(col => {
-        const [min, max] = ranges[col];
-        const colNumbers = new Set();
-        while (colNumbers.size < 5) {
-            const num = Math.floor(Math.random() * (max - min + 1)) + min;
-            colNumbers.add(num);
+    rooms[roomName].numbersCalled = []; 
+    rooms[roomName].availableNumbers = Array.from({ length: 75 }, (_, i) => i + 1); 
+    rooms[roomName].gameStarted = true;
+    rooms[roomName].currentNumber = null;
+    
+    io.to(roomName).emit('gameStart', `¡El juego de Bingo ha comenzado en la sala de ${maxPlayers}!`);
+    
+    // Empieza a cantar números 2 segundos después de iniciar
+    setTimeout(() => startCallingNumbers(roomName), 2000);
+}
+
+function callNextNumber(roomName) {
+    const room = rooms[roomName];
+    if (!room || room.availableNumbers.length === 0) {
+        clearInterval(room.intervalId);
+        io.to(roomName).emit('gameOver', 'Todos los números han sido cantados. Fin del juego.');
+        return;
+    }
+
+    const randomIndex = Math.floor(Math.random() * room.availableNumbers.length);
+    const newNumber = room.availableNumbers.splice(randomIndex, 1)[0]; 
+    
+    room.numbersCalled.push(newNumber);
+    room.currentNumber = newNumber;
+    
+    io.to(roomName).emit('newNumber', newNumber);
+    console.log(`[CALL] Sala ${roomName}: Cantado el número ${newNumber}.`);
+}
+
+function startCallingNumbers(roomName) {
+    // Canta un nuevo número cada 5 segundos
+    const intervalId = setInterval(() => callNextNumber(roomName), 5000); 
+    rooms[roomName].intervalId = intervalId;
+}
+
+function validateBingo(roomName, markedNumbers) {
+    const room = rooms[roomName];
+    if (!room) return false;
+
+    // Verificar que TODOS los números marcados realmente hayan sido cantados
+    const allValid = markedNumbers.every(num => room.numbersCalled.includes(num));
+
+    if (!allValid) {
+        return false;
+    }
+    
+    // Simplificado: si tiene 5 números válidos marcados, se asume un Bingo.
+    if (markedNumbers.length >= 5) {
+        return true; 
+    }
+
+    return false;
+}
+
+
+// ----------------------------------------------------
+// Lógica de Socket.io (Manejo de jugadores y eventos)
+// ----------------------------------------------------
+
+io.on('connection', (socket) => {
+    console.log(`[CONNECT] Un usuario se ha conectado: ${socket.id}`);
+
+    // Manejar la unión a una sala
+    socket.on('joinRoom', (players) => {
+        const maxPlayers = parseInt(players);
+        if (isNaN(maxPlayers) || maxPlayers < 2 || maxPlayers > 5) return;
+
+        const roomName = `room-${maxPlayers}-players`;
+        
+        if (!rooms[roomName]) {
+            rooms[roomName] = { 
+                max: maxPlayers, 
+                players: new Set(), 
+                gameStarted: false, 
+                numbersCalled: [],
+                availableNumbers: [],
+                intervalId: null
+            };
         }
-        myCardNumbers[col] = Array.from(colNumbers).sort((a, b) => a - b);
-    });
 
-    // 2. Renderizar el cartón en HTML
-    bingoCardContainer.innerHTML = ''; 
+        const room = rooms[roomName];
 
-    // A. Añadir encabezados B-I-N-G-O
-    columns.forEach(col => {
-        const headerCell = document.createElement('div');
-        headerCell.className = 'card-cell';
-        headerCell.textContent = col;
-        bingoCardContainer.appendChild(headerCell);
-    });
+        if (room.players.size < room.max && !room.gameStarted) {
+            socket.join(roomName);
+            room.players.add(socket.id);
+            socket.data.room = roomName; 
+            
+            const currentPlayers = room.players.size;
+            
+            console.log(`[JOIN] Usuario ${socket.id} se unió a ${roomName}. (${currentPlayers}/${room.max})`);
+            
+            socket.emit('joined', {
+                roomName: roomName,
+                players: currentPlayers,
+                max: room.max,
+                numbersCalled: room.numbersCalled 
+            });
 
-    // B. Añadir los números del cartón
-    for (let row = 0; row < 5; row++) {
-        columns.forEach((col) => {
-            const cell = document.createElement('div');
-            cell.className = 'card-cell';
+            io.to(roomName).emit('playerUpdate', { players: currentPlayers, max: room.max });
 
-            if (col === 'N' && row === 2) {
-                // Celda central: 'Free' o 'Libre'
-                cell.textContent = 'LIBRE';
-                cell.classList.add('marked'); 
-                cell.dataset.number = '0';
-                cell.dataset.column = 'N';
-            } else {
-                const number = myCardNumbers[col][row];
-                cell.textContent = number;
-                cell.dataset.number = number;
-                cell.dataset.column = col;
-                cell.addEventListener('click', markNumber); 
-                
-                // Si el número ya ha sido cantado (ej. por reconexión), márcalo
-                if (calledNumbers.has(number)) {
-                    cell.classList.add('marked');
-                }
+            // Iniciar el juego si la sala está llena
+            if (currentPlayers === room.max) {
+                initializeGame(roomName);
             }
-            bingoCardContainer.appendChild(cell);
-        });
-    }
-}
-
-// Función para marcar/desmarcar un número en el cartón (solo si ha sido cantado)
-function markNumber(event) {
-    const cell = event.target;
-    const number = parseInt(cell.dataset.number);
-
-    // Solo permite marcar si el número ha sido cantado por el servidor
-    if (calledNumbers.has(number)) {
-        cell.classList.toggle('marked');
-        checkPossibleBingo(); 
-    } else {
-        // En un juego real, esto no debería ocurrir si el jugador es honesto.
-        statusMessage.textContent = `¡El número ${number} aún no ha sido cantado!`;
-    }
-}
-
-// Lógica básica para verificar si el jugador tiene un bingo y habilitar el botón
-function checkPossibleBingo() {
-    const markedCells = document.querySelectorAll('.card-cell.marked');
-    
-    // Si tienes al menos 5 marcados (incluyendo el 'LIBRE')
-    if (markedCells.length >= 5) { 
-        callBingoButton.disabled = false;
-        callBingoButton.textContent = "¡BINGO LISTO!";
-    } else {
-        callBingoButton.disabled = true;
-        callBingoButton.textContent = "¡BINGO!";
-    }
-}
+        } else {
+            socket.emit('error', 'La sala está llena o el juego ya ha comenzado.');
+        }
+    });
 
 
-// --- 2. Lógica de Socket.io (Conexión al Servidor) ---
+    // Manejar cuando un jugador grita BINGO
+    socket.on('playerBingo', (data) => {
+        const roomName = socket.data.room;
+        if (!roomName) return;
 
-roomButtons.forEach(button => {
-    button.addEventListener('click', (event) => {
-        const players = event.target.dataset.players;
-        
-        // 1. Conectarse al servidor pidiendo la sala
-        socket.emit('joinRoom', players);
-        
-        // 2. Ocultar la selección de sala y mostrar el área de juego
-        roomSelection.style.display = 'none';
-        gameArea.style.display = 'block';
-        statusMessage.textContent = `Uniéndose a la sala de ${players} jugadores...`;
+        const isValid = validateBingo(roomName, data.markedNumbers);
+
+        if (isValid) {
+            clearInterval(rooms[roomName].intervalId); 
+            io.to(roomName).emit('gameOver', `¡${socket.id} ha gritado BINGO y ha ganado!`);
+            
+            delete rooms[roomName];
+
+        } else {
+            socket.emit('bingoResult', { success: false, lastNumber: rooms[roomName] ? rooms[roomName].currentNumber : null });
+            socket.to(roomName).emit('statusMessage', `¡Un jugador gritó BINGO, pero fue falso! Sigue jugando.`);
+        }
+    });
+
+    // Manejar desconexiones
+    socket.on('disconnect', () => {
+        const roomName = socket.data.room;
+        if (roomName && rooms[roomName]) {
+            rooms[roomName].players.delete(socket.id);
+            const currentPlayers = rooms[roomName].players.size;
+
+            if (rooms[roomName].gameStarted && currentPlayers === 0) {
+                clearInterval(rooms[roomName].intervalId);
+                delete rooms[roomName];
+            } else if (rooms[roomName]) {
+                io.to(roomName).emit('playerUpdate', { players: currentPlayers, max: rooms[roomName].max });
+            }
+        }
     });
 });
 
-// Evento que se dispara cuando el servidor confirma que entraste a la sala
-socket.on('joined', (data) => {
-    currentRoom = data.roomName;
-    
-    // Generar un cartón de bingo al unirse
-    generateBingoCard();
-    
-    // Actualizar el estado con números ya cantados (si los hay)
-    if (data.numbersCalled && data.numbersCalled.length > 0) {
-        data.numbersCalled.forEach(num => calledNumbers.add(num));
-        statusMessage.textContent = `Te uniste a una partida en curso. El último número cantado es ${data.numbersCalled[data.numbersCalled.length - 1]}.`;
-    } else {
-        statusMessage.textContent = `Conectado a la sala. Esperando ${data.max - data.players} jugadores más.`;
-    }
-});
+// ----------------------------------------------------
+// Iniciar el Servidor
+// ----------------------------------------------------
 
-// Evento que se dispara cuando el servidor canta un nuevo número
-socket.on('newNumber', (number) => {
-    calledNumbers.add(number); 
-    calledNumberDisplay.textContent = number; 
-    statusMessage.textContent = `¡Número Cantado: ${number}!`;
-
-    // Marcar el número si existe en el cartón
-    const cellToMark = document.querySelector(`.card-cell[data-number="${number}"]`);
-    if (cellToMark && !cellToMark.classList.contains('marked')) {
-        cellToMark.classList.add('marked');
-        checkPossibleBingo(); 
-    }
-});
-
-// Evento que notifica cuando la sala está llena y el juego comienza
-socket.on('gameStart', (message) => {
-    statusMessage.textContent = message;
-});
-
-
-// Evento que se dispara al hacer clic en el botón "¡BINGO!"
-callBingoButton.addEventListener('click', () => {
-    callBingoButton.disabled = true;
-    callBingoButton.textContent = "Verificando...";
-    
-    // Recolectar solo los números que están marcados y que no sean la celda 'LIBRE'
-    const markedNumbers = Array.from(document.querySelectorAll('.card-cell.marked'))
-        .map(cell => parseInt(cell.dataset.number))
-        .filter(num => num !== 0); 
-
-    // Enviar los números marcados al servidor para validación
-    socket.emit('playerBingo', {
-        room: currentRoom,
-        markedNumbers: markedNumbers
-    });
-});
-
-// Evento que se dispara cuando el servidor responde a la llamada de BINGO
-socket.on('bingoResult', (result) => {
-    if (result.success) {
-        alert(`¡BINGO VERIFICADO! ¡Ganaste! El juego ha terminado.`);
-        // Recargar la página para volver a la selección de sala
-        window.location.reload(); 
-    } else {
-        alert(`BINGO FALSO. ¡Sigue jugando!`);
-        statusMessage.textContent = `¡Bingo Falso! El último número cantado fue ${result.lastNumber}.`;
-        callBingoButton.disabled = false;
-        callBingoButton.textContent = "¡BINGO LISTO!";
-    }
-});
-
-// Evento para mensajes de estado general (ej. alguien se une, alguien se va)
-socket.on('playerUpdate', (data) => {
-    if (data.players < data.max) {
-        statusMessage.textContent = `Esperando ${data.max - data.players} jugadores más...`;
-    }
-});
-
-socket.on('gameOver', (message) => {
-    statusMessage.textContent = message;
-    alert(message);
-    window.location.reload();
-});
-
-
-// Inicializar: asegurarse de que el área de juego esté oculta al cargar
-document.addEventListener('DOMContentLoaded', () => {
-    gameArea.style.display = 'none';
+server.listen(PORT, () => {
+    console.log(`Servidor escuchando en el puerto ${PORT}`);
 });
