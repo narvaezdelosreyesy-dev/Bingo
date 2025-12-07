@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bingo Online Bacanísimo</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>🎮 Bingo Online Bacanísimo 🎮</h1>
+        <p>Selecciona tu sala y ¡a jugar!</p>
+    </header>
+
+    <main>
+        <section id="room-selection">
+            <h2>Elige el número de jugadores:</h2>
+            <div class="room-options">
+                <button class="room-btn" data-players="2">Sala de 2 Jugadores</button>
+                <button class="room-btn" data-players="3">Sala de 3 Jugadores</button>
+                <button class="room-btn" data-players="4">Sala de 4 Jugadores</button>
+                <button class="room-btn" data-players="5">Sala de 5 Jugadores</button>
+            </div>
+        </section>
+
+        <section id="game-area" style="display: none;">
+            <h2>Tu Cartón de Bingo</h2>
+            <div id="bingo-card" class="card-grid">
+                </div>
+
+            <div id="game-info">
+                <p>Número Cantado: <span id="called-number">--</span></p>
+                <button id="call-bingo" disabled>¡BINGO!</button>
+            </div>
+        </section>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
