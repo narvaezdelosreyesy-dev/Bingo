@@ -1,7 +1,7 @@
 {
   "name": "bingo-online-bacanisimo",
   "version": "1.0.0",
-  "description": "Servidor de juego de Bingo online multijugador.",
+  "description": "Servidor de juego de Bingo online multijugador usando Socket.io.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
