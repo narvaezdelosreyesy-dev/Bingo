@@ -86,6 +86,7 @@ main {
     background-color: #ffcc00; /* Color llamativo al marcar */
     color: #333;
 }
+
 .card-number {
     display: inline-block;
     width: 40px;
